@@ -3,7 +3,8 @@
 
 MCallbackIdArray idList;
 
-void AddTransform(MObject &transformNode, 
+//called for each time a node is transformed
+void hasTransformed(MObject &transformNode, 
 	MDagMessage::MatrixModifiedFlags &modified, void* clientData)
 {
 	MStatus ms;
@@ -11,30 +12,39 @@ void AddTransform(MObject &transformNode,
 	if (ms == MStatus::kSuccess) {
 
 		MFnTransform transNode(transformNode, &ms);
+
 		if (ms == MStatus::kSuccess) {
-	
-			MGlobal::displayInfo(transNode.name() + " Has been transformed");
+			
+			//print the transformed node
+			MGlobal::displayInfo(transNode.name() + " HAS BEEN TRANSFORMED");
 		}
 	}
 }
 
-void AttributePlugVertex(MNodeMessage::AttributeMessage msg, MPlug & plug, MPlug & otherPlug, void* clientData)
+//whenever a vertex has been changed
+void attributePlugVertex(MNodeMessage::AttributeMessage msg, MPlug & plug, MPlug & otherPlug, void* clientData)
 {
-
+	//Excluding things in the plugs that are not vertices
 	if (msg & MNodeMessage::AttributeMessage::kAttributeSet && !plug.isArray() && plug.isElement()) {
 		MStatus ms;
+
+		//get the node the plug is connected to
 		MObject node = plug.node(&ms);
 
 		if (ms == MStatus::kSuccess) {
 
 			MFnMesh mesh(node, &ms);
+
 			if (ms == MStatus::kSuccess) {
 				MPoint p;
+
+				//get the vertices of the mesh and p. p = vertex coordinates (x, y, z)
 				ms = mesh.getPoint(plug.logicalIndex(), p, MSpace::kObject);
 
 				if (ms == MStatus::kSuccess) {
 
-					MGlobal::displayInfo("Name of mesh: " + mesh.name() + " Vertex changed: " + plug.name()
+					//print the mesh's vertex point that changed and its new coordinates 
+					MGlobal::displayInfo("VERTEX CHANGED: " + plug.name()
 						+ " " + p.x + " " + p.y + " " + p.z);
 				}
 			}
@@ -44,67 +54,82 @@ void AttributePlugVertex(MNodeMessage::AttributeMessage msg, MPlug & plug, MPlug
 	}
 }
 
-void ChangeNameFunc(MObject &node, const MString &str, void * clientData)
+//prints the name of a node whenever the name changes
+void changeNameFunc(MObject &node, const MString &str, void * clientData)
 {
-	MGlobal::displayInfo("name changed");
+	MStatus ms;
+	if (ms == MStatus::kSuccess) {
 
-	MFnMesh meshNode(node);
-	MString m = ("name of mesh: " + meshNode.name());
-	MGlobal::displayInfo(m);
+		MFnMesh mesh(node, &ms);
+
+		if (ms == MStatus::kSuccess) {
+			MGlobal::displayInfo("NAME CHANGED: " + mesh.name());
+		}
+	}
 
 }
 
-void TimeElapsedFunction(float elapsedTime, float lastTime, void* clientData)
+//prints the time elapsed every 5 seconds
+void timeElapsedFunction(float elapsedTime, float lastTime, void* clientData)
 {
 
 	MString s = "";
 	s += elapsedTime;
 
-	MGlobal::displayInfo("Elapsed Time: " + s);
+	MGlobal::displayInfo("ELAPSED TIME: " + s);
 }
 
-void MNodeFunction(MObject &node, void* clientData)
+//Whenever a node has been created 
+void mNodeFunction(MObject &node, void* clientData)
 {
 
-
 	MStatus res = MS::kSuccess;
+
+	//check if the node holds a mesh
 	if (node.hasFn(MFn::kMesh)){
 
-		MCallbackId nameId = MNodeMessage::addNameChangedCallback(node, ChangeNameFunc, NULL, &res);
+		//call when the name of the node changes
+		MCallbackId nameId = MNodeMessage::addNameChangedCallback(node, changeNameFunc, NULL, &res);
 		
 		if (res == MS::kSuccess) {
+			//append callback ID to a list
 			idList.append(nameId);
-			MGlobal::displayInfo("add name callback Succeeded");
 
 			MFnMesh mesh(node);
-			MGlobal::displayInfo("a node has been created" + mesh.name());
+
+			//prints the name of the mesh whenever a node has been created
+			MGlobal::displayInfo("NODE CREATED:" + mesh.name());
 		}
 		else {
 			MGlobal::displayInfo("add name callback Failed");
 		}
 
-		MCallbackId attributeId = MNodeMessage::addAttributeChangedCallback(node, AttributePlugVertex, NULL, &res);
+
+		MCallbackId attributeId = MNodeMessage::addAttributeChangedCallback(node, attributePlugVertex, NULL, &res);
 
 		if (res == MS::kSuccess) {
 			idList.append(attributeId);
-			MGlobal::displayInfo("attribute callback suceeeded");
 		}
 		else {
 			MGlobal::displayInfo("attribute callback Failed");
 		}
 	}
 
+	//Check if the node holds a transform
 	if (node.hasFn(MFn::kTransform)){
 
 		MFnTransform meshTransform(node);
+
+		//get the the node's transform, allways child of the mesh in the hierarchy
 		MDagPath pathNode = MDagPath::getAPathTo(meshTransform.child(0));
-		 
-		MCallbackId transformId = MDagMessage::addWorldMatrixModifiedCallback(pathNode, AddTransform, NULL, &res);
+		
+		//check if worldtransformation matrix is changed in Maya
+		MCallbackId transformId = MDagMessage::addWorldMatrixModifiedCallback(pathNode, hasTransformed, NULL, &res);
 
 		if (res == MS::kSuccess) {
 
+			//append callback ID to a list
 			idList.append(transformId);
-			MGlobal::displayInfo("transform callback Succeeded");
 		}
 
 		else {
@@ -115,9 +140,10 @@ void MNodeFunction(MObject &node, void* clientData)
 
 }
 
+//called when plugin is loaded
 EXPORT MStatus initializePlugin(MObject obj)
 {
-	//this indicates errors
+	//This is for checking errors
 	MStatus res = MS::kSuccess;
 
 	MFnPlugin myPlugin(obj, "Maya Plugin", "1.0", "Any", &res);
@@ -125,36 +151,40 @@ EXPORT MStatus initializePlugin(MObject obj)
 		CHECK_MSTATUS(res);
 	}
 
-	MCallbackId nodeId = MDGMessage::addNodeAddedCallback(MNodeFunction, kDefaultNodeType, NULL, &res);
+	MCallbackId nodeId = MDGMessage::addNodeAddedCallback(mNodeFunction, kDefaultNodeType, NULL, &res);
 	
-
+	//callback Succeeded
 	if (res == MS::kSuccess) {
-		idList.append(nodeId);
-		MGlobal::displayInfo("added node callback Succeeded");
+		
+		//append callback ID to a list
+		idList.append(nodeId);	
 	}
 	else {
-		MGlobal::displayInfo("added node callback Failed");
+		MGlobal::displayInfo("node callback Failed");
 	}
 
-	MCallbackId timeId = MTimerMessage::addTimerCallback(5.0, TimeElapsedFunction, NULL, &res);
+	MCallbackId timeId = MTimerMessage::addTimerCallback(5.0, timeElapsedFunction, NULL, &res);
 
 	if (res == MS::kSuccess) {
+		//append callback ID to a list
 		idList.append(timeId);
-		MGlobal::displayInfo("time elapsed callback Succeeded");
+
 	}
 	else {
 		MGlobal::displayInfo("time elapsed callback Failed");
 	}
-	MGlobal::displayInfo("Maya plugin loaded!");
+
+	MGlobal::displayInfo("MAYA PLUGIN LOADED!");
 
 	return res;
 }
 
+//called when plugin is unloaded
 EXPORT MStatus uninitializePlugin(MObject obj)
 {
 	MFnPlugin plugin(obj);
 
-	MGlobal::displayInfo("Maya plugin unloaded!");
+	MGlobal::displayInfo("MAYA PLUGIN UNLOADED!");
 
 	MMessage::removeCallbacks(idList);
 
