@@ -1,7 +1,7 @@
 # Maya_Plugin
 Maya Plugin and Callbacks using C++
 
-Desc; The plugin writtten in c++, listens to callbacks from Maya and prints information abot the events in the Maya console. When compiled the plugin ceates a .mll file that can be loaded by the Plug-in Manager in Maya Autodesk.
+Desc; The plugin writtten in c++, get callbacks from Maya and prints information about the events in the Maya console. When compiled the plugin ceates a mll file that can be loaded by the Plug-in Manager in Maya Autodesk.
 
 The code can be found in main.cpp in the folder MayaPlugin.
 
